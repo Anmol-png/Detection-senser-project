@@ -4,7 +4,7 @@ import numpy as np
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 st.set_page_config(page_title="Distraction Sense", layout="centered")
-st.title("📚 Distraction Sense – Focus Detection (Web Version)")
+st.title("📚 Distraction Sense – Focus Detection")
 
 mp_face = mp.solutions.face_mesh
 
@@ -12,7 +12,6 @@ class FaceDetector(VideoTransformerBase):
     def __init__(self):
         self.face_mesh = mp_face.FaceMesh(
             max_num_faces=1,
-            refine_landmarks=True,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
@@ -30,12 +29,11 @@ class FaceDetector(VideoTransformerBase):
         return img
 
 ctx = webrtc_streamer(
-    key="focus-detection",
+    key="distraction-sense",
     video_transformer_factory=FaceDetector,
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
 )
 
 if ctx.video_transformer:
-    st.subheader("Current Status:")
-    st.success(ctx.video_transformer.status)
+    st.success(f"Current Status: {ctx.video_transformer.status}")
