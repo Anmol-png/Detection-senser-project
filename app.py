@@ -1,42 +1,41 @@
 import streamlit as st
-import cv2
 import mediapipe as mp
 import numpy as np
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 st.set_page_config(page_title="Distraction Sense", layout="centered")
-st.title("📚 Distraction Sense – Focus Detection (Step 1)")
+st.title("📚 Distraction Sense – Focus Detection (Web Version)")
 
-run = st.checkbox("Start Camera")
+mp_face = mp.solutions.face_mesh
 
-FRAME_WINDOW = st.image([])
+class FaceDetector(VideoTransformerBase):
+    def __init__(self):
+        self.face_mesh = mp_face.FaceMesh(
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        self.status = "Focused"
 
-mp_face_detection = mp.solutions.face_detection
-face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+    def transform(self, frame):
+        img = frame.to_ndarray(format="rgb24")
+        results = self.face_mesh.process(img)
 
-camera = cv2.VideoCapture(0)
+        if results.multi_face_landmarks:
+            self.status = "Focused"
+        else:
+            self.status = "Distracted"
 
-while run:
-    ret, frame = camera.read()
-    if not ret:
-        st.write("Failed to access camera")
-        break
+        return img
 
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = face_detection.process(rgb_frame)
+ctx = webrtc_streamer(
+    key="focus-detection",
+    video_transformer_factory=FaceDetector,
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True,
+)
 
-    if results.detections:
-        for detection in results.detections:
-            bbox = detection.location_data.relative_bounding_box
-            h, w, _ = frame.shape
-            x = int(bbox.xmin * w)
-            y = int(bbox.ymin * h)
-            bw = int(bbox.width * w)
-            bh = int(bbox.height * h)
-
-            cv2.rectangle(frame, (x, y), (x + bw, y + bh), (0, 255, 0), 2)
-            cv2.putText(frame, "Face Detected", (x, y - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-
-    FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-camera.release()
+if ctx.video_transformer:
+    st.subheader("Current Status:")
+    st.success(ctx.video_transformer.status)
